@@ -1,14 +1,14 @@
 const financingScores = {
-  cash: 24,
-  preunderwritten: 21,
-  conventional: 17,
-  fha: 10
+  cash: 20,
+  preunderwritten: 16,
+  conventional: 12,
+  fha: 6
 };
 
 const inspectionScores = {
-  waived: 18,
-  limited: 12,
-  standard: 5
+  waived: 14,
+  limited: 9,
+  standard: 4
 };
 
 const inspectionRisk = {
@@ -17,8 +17,18 @@ const inspectionRisk = {
   waived: 28
 };
 
+export const factorLabels = {
+  price: "Price",
+  downPayment: "Down payment",
+  financing: "Financing certainty",
+  speed: "Closing speed",
+  inspection: "Inspection terms",
+  appraisalGap: "Appraisal protection"
+};
+
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-const HIGH_RISK_THRESHOLD = 55;
+
+export const HIGH_RISK_THRESHOLD = 55;
 
 export function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", {
@@ -47,27 +57,62 @@ export function estimateMonthlyPayment(offer) {
   return Math.round(principalAndInterest + taxesAndInsurance);
 }
 
-export function calculateOfferStrength(offer, house) {
-  const pricePremium = ((offer.price - house.listPrice) / house.listPrice) * 100;
-  const priceScore = clamp(28 + pricePremium * 2.2, 16, 42);
-  const downPaymentScore = clamp(offer.downPaymentPercent * 0.7, 4, 16);
-  const financingScore = financingScores[offer.financing] ?? 10;
-  const speedScore = offer.closingDays <= 21 ? 14 : offer.closingDays <= 30 ? 10 : 5;
-  const inspectionScore = inspectionScores[offer.inspection] ?? 5;
-  const appraisalScore = clamp(offer.appraisalGap / 1000, 0, 12);
+function getSpeedScore(closingDays) {
+  if (closingDays <= 14) {
+    return 12;
+  }
 
-  return Math.round(
-    clamp(
-      priceScore +
-        downPaymentScore +
-        financingScore +
-        speedScore +
-        inspectionScore +
-        appraisalScore,
-      0,
-      100
-    )
+  if (closingDays <= 21) {
+    return 10;
+  }
+
+  return closingDays <= 30 ? 7 : 3;
+}
+
+// Every offer (player and competitor) is broken into the same six components.
+// The seller persona then weights each component, so "strongest offer" genuinely
+// depends on who is selling.
+function getOfferComponents(offer, house) {
+  const pricePremium = ((offer.price - house.listPrice) / house.listPrice) * 100;
+
+  return {
+    price: clamp(14 + pricePremium * 2.6, 6, 30),
+    downPayment:
+      offer.financing === "cash" ? 10 : clamp(offer.downPaymentPercent * 0.5, 2, 10),
+    financing: financingScores[offer.financing] ?? 6,
+    speed: getSpeedScore(offer.closingDays),
+    inspection: inspectionScores[offer.inspection] ?? 4,
+    appraisalGap: clamp(offer.appraisalGap / 1750, 0, 10)
+  };
+}
+
+export function calculateOfferStrength(offer, house, persona) {
+  const components = getOfferComponents(offer, house);
+  const total = Object.entries(components).reduce(
+    (sum, [factor, score]) => sum + score * (persona.weights[factor] ?? 1),
+    0
   );
+
+  return Math.round(clamp(total, 0, 100));
+}
+
+export function getPersonaTopFactors(persona, count = 2) {
+  return Object.entries(persona.weights)
+    .sort(([, leftWeight], [, rightWeight]) => rightWeight - leftWeight)
+    .slice(0, count)
+    .map(([factor]) => factorLabels[factor]);
+}
+
+function getCashRisk(cashBuffer) {
+  if (cashBuffer < 0) {
+    return 30;
+  }
+
+  if (cashBuffer < 6000) {
+    return 18;
+  }
+
+  return cashBuffer < 12000 ? 9 : 2;
 }
 
 export function calculateRiskScore(offer, house) {
@@ -79,7 +124,7 @@ export function calculateRiskScore(offer, house) {
   );
   const cashNeeded = estimateCashNeeded(offer);
   const cashBuffer = house.buyerCashAvailable - cashNeeded;
-  const cashRisk = cashBuffer < 0 ? 30 : cashBuffer < 6000 ? 18 : cashBuffer < 12000 ? 9 : 2;
+  const cashRisk = getCashRisk(cashBuffer);
   const monthlyPayment = estimateMonthlyPayment(offer);
   const monthlyRisk =
     monthlyPayment > house.monthlyComfortLimit
@@ -140,8 +185,8 @@ export function getWarnings(offer, house) {
   return notes;
 }
 
-export function buildOfferComparisons(offer, house, competitors) {
-  const playerStrength = calculateOfferStrength(offer, house);
+export function buildOfferComparisons(offer, house, competitors, persona) {
+  const playerStrength = calculateOfferStrength(offer, house, persona);
   const playerRisk = calculateRiskScore(offer, house);
 
   return [
@@ -166,7 +211,7 @@ export function buildOfferComparisons(offer, house, competitors) {
       closingDays: competitor.closingDays,
       inspection: competitor.inspection,
       appraisalGap: competitor.appraisalGap,
-      sellerAppealScore: competitor.strengthScore,
+      sellerAppealScore: calculateOfferStrength(competitor, house, persona),
       buyerRiskScore: null
     }))
   ].sort((left, right) => {
@@ -186,30 +231,17 @@ export function buildOfferComparisons(offer, house, competitors) {
   });
 }
 
-function getWinningReason(winningOffer) {
-  if (winningOffer.financing === "cash") {
-    return "The seller favored the certainty and speed of a cash offer.";
-  }
-
-  if (winningOffer.closingDays <= 21 && winningOffer.inspection !== "standard") {
-    return "The seller favored a faster close paired with lower inspection friction.";
-  }
-
-  if (winningOffer.appraisalGap >= 10000) {
-    return "The seller favored stronger appraisal protection if the home appraises low.";
-  }
-
-  return "The seller favored the offer with the strongest overall mix of price, certainty, speed, and terms.";
-}
-
-export function evaluateOffer(offer, house, competitors) {
-  const offerStrengthScore = calculateOfferStrength(offer, house);
+export function evaluateOffer(offer, house, competitors, persona) {
+  const offerStrengthScore = calculateOfferStrength(offer, house, persona);
   const riskScore = calculateRiskScore(offer, house);
-  const comparisons = buildOfferComparisons(offer, house, competitors);
+  const comparisons = buildOfferComparisons(offer, house, competitors, persona);
   const winningOffer = comparisons[0];
   const playerRank = comparisons.findIndex((comparison) => comparison.isPlayer) + 1;
-  const bestCompetitorScore = Math.max(...competitors.map((competitor) => competitor.strengthScore));
-  const sellerWouldAccept = winningOffer.isPlayer;
+  const bestCompetitorScore = Math.max(
+    ...comparisons
+      .filter((comparison) => !comparison.isPlayer)
+      .map((comparison) => comparison.sellerAppealScore)
+  );
   const won = winningOffer.isPlayer;
   const cashNeeded = estimateCashNeeded(offer);
   const monthlyPayment = estimateMonthlyPayment(offer);
@@ -217,16 +249,16 @@ export function evaluateOffer(offer, house, competitors) {
 
   let category = "Weak Offer";
   let lesson =
-    "Your offer was not strong enough for this market. A higher price can help, but certainty and cleaner terms matter too.";
+    "Your offer was not strong enough for this seller. A higher price can help, but certainty and cleaner terms matter too.";
 
   if (won && riskScore < HIGH_RISK_THRESHOLD) {
     category = "Smart Win";
     lesson =
-      "You won by pairing a competitive price with strong terms while keeping enough protection and cash buffer.";
+      "You won by matching what this seller cared about while keeping enough protection and cash buffer.";
   } else if (won) {
     category = "Risky Win";
     lesson =
-      "The seller would like the offer, but the risk is too high for a first-time buyer. Winning is not worth blowing past your safety limits.";
+      "The seller would take the offer, but the risk is too high for a first-time buyer. Winning is not worth blowing past your safety limits.";
   } else if (!won && riskScore < 45) {
     category = "Responsible Walkaway";
     lesson =
@@ -237,14 +269,14 @@ export function evaluateOffer(offer, house, competitors) {
     won,
     category,
     lesson,
+    persona,
     offerStrengthScore,
     riskScore,
     totalScore: offerStrengthScore,
-    recklessPenalty: 0,
     bestCompetitorScore,
-    sellerWouldAccept,
+    sellerWouldAccept: won,
     winningOffer,
-    winningReason: getWinningReason(winningOffer),
+    winningReason: persona.decisionStyle,
     comparisons,
     playerRank,
     scoreGap,
