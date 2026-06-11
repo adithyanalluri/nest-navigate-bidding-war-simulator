@@ -1,6 +1,6 @@
 import { formatCurrency } from "../utils/scoring.js";
 
-function MarketPanel({ house }) {
+function MarketPanel({ house, persona }) {
   return (
     <aside className="panel market-panel">
       <div className="panel-heading">
@@ -30,7 +30,7 @@ function MarketPanel({ house }) {
       <div className="market-note">
         <h3>Seller signals</h3>
         <div className="seller-signal-list">
-          {house.sellerPriorities.map((priority) => (
+          {persona.priorities.map((priority) => (
             <p className="seller-signal" key={priority}>
               {priority}
             </p>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { optionLabels } from "../data/gameData.js";
-import { formatCurrency } from "../utils/scoring.js";
+import { formatCurrency, getPersonaTopFactors } from "../utils/scoring.js";
 import ProgressBar from "./ProgressBar.jsx";
 
 function OfferComparisonCard({ offer, isRevealed }) {
@@ -46,12 +46,12 @@ function OfferComparisonCard({ offer, isRevealed }) {
       <div className="comparison-scores">
         <div>
           <span>Seller appeal</span>
-          <strong>{offer.sellerAppealScore}/100</strong>
+          <strong>{isRevealed ? `${offer.sellerAppealScore}/100` : "—"}</strong>
         </div>
         {offer.isPlayer && (
           <div>
             <span>Buyer risk</span>
-            <strong>{offer.buyerRiskScore}/100</strong>
+            <strong>{isRevealed ? `${offer.buyerRiskScore}/100` : "—"}</strong>
           </div>
         )}
       </div>
@@ -61,10 +61,11 @@ function OfferComparisonCard({ offer, isRevealed }) {
 
 function DecisionReveal({ result, onContinue }) {
   const [stage, setStage] = useState("reviewing");
+  const persona = result.persona;
 
   useEffect(() => {
-    const revealTimer = window.setTimeout(() => setStage("winner"), 700);
-    const readyTimer = window.setTimeout(() => setStage("ready"), 1300);
+    const revealTimer = window.setTimeout(() => setStage("winner"), 900);
+    const readyTimer = window.setTimeout(() => setStage("ready"), 1500);
 
     return () => {
       window.clearTimeout(revealTimer);
@@ -91,8 +92,8 @@ function DecisionReveal({ result, onContinue }) {
             : "The seller is reviewing the offers..."}
         </h1>
         <p>
-          Price matters, but the seller is comparing confidence, speed, inspection risk, and appraisal
-          protection before choosing the strongest path to closing.
+          Price matters, but every seller weighs confidence, speed, inspection risk, and appraisal
+          protection in their own way before choosing the strongest path to closing.
         </p>
       </div>
 
@@ -103,7 +104,24 @@ function DecisionReveal({ result, onContinue }) {
       </div>
 
       <div className="reveal-footer" aria-live="polite">
-        <p>{isRevealed ? result.winningReason : "Final terms are being compared side by side."}</p>
+        {isRevealed ? (
+          <div className="persona-reveal">
+            <span className="comparison-label">Seller revealed</span>
+            <h2>{persona.label}</h2>
+            <p>
+              {persona.headline} {result.winningReason}
+            </p>
+            <div className="persona-factors">
+              {getPersonaTopFactors(persona).map((factor) => (
+                <span className="priority-chip" key={factor}>
+                  Weighted: {factor}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p>Final terms are being compared side by side.</p>
+        )}
         {isReady && (
           <button className="primary-button" type="button" onClick={onContinue}>
             See result

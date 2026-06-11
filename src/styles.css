@@ -497,21 +497,8 @@ input[type="range"] {
   color: #176b57;
 }
 
-.score-meter {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 18px;
-}
-
-.score-label {
-  display: flex;
-  justify-content: space-between;
-  color: #40504a;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
 .meter-track {
+  position: relative;
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
@@ -522,6 +509,7 @@ input[type="range"] {
   display: block;
   height: 100%;
   border-radius: inherit;
+  transition: width 280ms ease;
 }
 
 .meter-fill.strength {
@@ -530,6 +518,15 @@ input[type="range"] {
 
 .meter-fill.risk {
   background: #d16b4a;
+}
+
+.meter-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  border-left: 2px solid rgba(180, 71, 41, 0.55);
+  background: rgba(180, 71, 41, 0.14);
 }
 
 .feedback-box {
@@ -552,58 +549,77 @@ input[type="range"] {
   margin-top: 20px;
 }
 
-.signal-grid {
+.tension-board {
   display: grid;
   gap: 12px;
   margin-bottom: 18px;
 }
 
-.signal-card {
+.tension-meter {
   border-radius: 8px;
   border: 1px solid #dde6e1;
   background: #f7f8f4;
-  padding: 15px;
+  padding: 14px 15px;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease;
 }
 
-.signal-card span {
-  display: block;
+.tension-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.tension-label span {
   color: #66756f;
   font-size: 0.76rem;
   font-weight: 850;
   text-transform: uppercase;
 }
 
-.signal-card strong {
-  display: block;
-  margin-top: 4px;
+.tension-label strong {
   color: #162821;
-  font-size: 1.16rem;
+  font-size: 1.02rem;
 }
 
-.signal-card p {
-  margin: 8px 0 0;
+.tension-meter p {
+  margin: 10px 0 0;
   color: #596862;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
-.signal-card.strong {
+.tension-meter.strong {
   border-color: rgba(23, 107, 87, 0.24);
   background: #eef7f2;
 }
 
-.signal-card.steady {
+.tension-meter.steady {
   border-color: rgba(63, 105, 142, 0.2);
   background: #f1f6f8;
 }
 
-.signal-card.watch {
+.tension-meter.watch {
   border-color: rgba(187, 139, 45, 0.24);
   background: #faf6e9;
 }
 
-.signal-card.risk {
+.tension-meter.risk {
   border-color: rgba(180, 71, 41, 0.24);
   background: #fbf0ec;
+}
+
+.danger-note {
+  margin: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 71, 41, 0.3);
+  background: #fbf0ec;
+  padding: 10px 12px;
+  color: #b34729;
+  font-size: 0.86rem;
+  font-weight: 750;
 }
 
 .reveal-screen {
@@ -751,6 +767,24 @@ input[type="range"] {
   font-weight: 750;
 }
 
+.persona-reveal h2 {
+  margin: 4px 0 6px;
+  color: #172720;
+  font-size: 1.25rem;
+}
+
+.persona-reveal p {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.persona-factors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
 .result-screen {
   min-height: calc(100vh - 64px);
   align-content: center;
@@ -858,6 +892,103 @@ input[type="range"] {
 .result-actions {
   justify-content: flex-end;
   margin-top: 28px;
+}
+
+.next-seller-note {
+  margin: 12px 0 0;
+  color: #7a8884;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.scorecard-strip {
+  margin-top: 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(25, 45, 39, 0.1);
+  background: #ffffff;
+  padding: 18px;
+}
+
+.scorecard-strip h2 {
+  margin: 0 0 12px;
+  color: #172720;
+  font-size: 1rem;
+}
+
+.scorecard-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scorecard-stats div {
+  border-radius: 8px;
+  background: #f7f8f4;
+  padding: 12px;
+}
+
+.scorecard-stats span {
+  display: block;
+  color: #687772;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.scorecard-stats strong {
+  display: block;
+  margin-top: 4px;
+  color: #132821;
+  font-size: 1.2rem;
+}
+
+.track-record-note {
+  margin: 16px 0 0;
+  color: #61716c;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.confetti span {
+  position: absolute;
+  top: -16px;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confetti-fall;
+  animation-timing-function: ease-in;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0.9;
+    transform: translateY(105vh) rotate(540deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti span {
+    animation: none;
+  }
+
+  .meter-fill {
+    transition: none;
+  }
 }
 
 @media (max-width: 980px) {
@@ -988,5 +1119,13 @@ input[type="range"] {
   .reveal-footer {
     display: grid;
     padding: 16px;
+  }
+
+  .scorecard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .next-seller-note {
+    text-align: center;
   }
 }

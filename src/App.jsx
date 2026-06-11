@@ -3,15 +3,20 @@ import StartScreen from "./components/StartScreen.jsx";
 import GameScreen from "./components/GameScreen.jsx";
 import DecisionReveal from "./components/DecisionReveal.jsx";
 import ResultScreen from "./components/ResultScreen.jsx";
-import { competitors, house, initialOffer } from "./data/gameData.js";
+import { competitors, getRandomPersona, house, initialOffer } from "./data/gameData.js";
 import { evaluateOffer } from "./utils/scoring.js";
+import { recordResult } from "./utils/scorecard.js";
 
 function App() {
   const [screen, setScreen] = useState("start");
+  const [persona, setPersona] = useState(() => getRandomPersona());
   const [offer, setOffer] = useState(initialOffer);
   const [result, setResult] = useState(null);
 
-  const preview = useMemo(() => evaluateOffer(offer, house, competitors), [offer]);
+  const preview = useMemo(
+    () => evaluateOffer(offer, house, competitors, persona),
+    [offer, persona]
+  );
 
   const updateOffer = (field, value) => {
     setOffer((currentOffer) => ({
@@ -21,13 +26,20 @@ function App() {
   };
 
   const startGame = () => {
+    // A finished round means a fresh market: draw a different seller persona.
+    if (result) {
+      setPersona((currentPersona) => getRandomPersona(currentPersona.id));
+    }
+
     setOffer(initialOffer);
     setResult(null);
     setScreen("game");
   };
 
   const submitOffer = () => {
-    setResult(evaluateOffer(offer, house, competitors));
+    const finalResult = evaluateOffer(offer, house, competitors, persona);
+    setResult(finalResult);
+    recordResult(finalResult.category);
     setScreen("reveal");
   };
 
@@ -37,7 +49,7 @@ function App() {
       {screen === "game" && (
         <GameScreen
           house={house}
-          competitors={competitors}
+          persona={persona}
           offer={offer}
           preview={preview}
           onOfferChange={updateOffer}

@@ -1,12 +1,11 @@
 import ProgressBar from "./ProgressBar.jsx";
-import { formatCurrency } from "../utils/scoring.js";
+import { formatCurrency, getPersonaTopFactors } from "../utils/scoring.js";
+import { loadScorecard } from "../utils/scorecard.js";
 
 function getOutcomeDetails(result) {
   if (result.category === "Smart Win") {
     return {
       why: `Your offer ranked #${result.playerRank} on seller appeal and still kept buyer risk out of the danger zone.`,
-      cared:
-        "The seller saw a credible path to close: strong financing, useful appraisal protection, and terms that reduced uncertainty.",
       lesson:
         "A winning offer can be aggressive and still disciplined when the buyer keeps cash, payment, and inspection risk in view."
     };
@@ -15,8 +14,6 @@ function getOutcomeDetails(result) {
   if (result.category === "Risky Win") {
     return {
       why: `Your offer gave the seller the strongest appeal score, but your buyer risk landed at ${result.riskScore}/100.`,
-      cared:
-        "The seller cared about the confidence of closing more than whether the offer left you with enough protection afterward.",
       lesson:
         "Winning the house is not the same as making the right move. A first-time buyer still needs room for appraisal, repairs, and payment comfort."
     };
@@ -24,9 +21,7 @@ function getOutcomeDetails(result) {
 
   if (result.category === "Responsible Walkaway") {
     return {
-      why: `${result.winningOffer.name} had the strongest seller appeal, but your lower-risk offer kept you from overextending.`,
-      cared:
-        "The seller prioritized the offer that looked easiest to close, especially on certainty, timeline, and cleaner terms.",
+      why: `${result.winningOffer.name} had the strongest appeal for this seller, but your lower-risk offer kept you from overextending.`,
       lesson:
         "Losing a bidding war can still be a good outcome when the alternative is stretching past your safety limits."
     };
@@ -34,30 +29,61 @@ function getOutcomeDetails(result) {
 
   return {
     why: `${result.winningOffer.name} outscored your seller appeal by ${result.scoreGap} points.`,
-    cared:
-      "The seller compared more than price. Financing certainty, closing speed, inspection terms, and appraisal protection all affected the decision.",
     lesson:
-      "A stronger next offer does not always mean only raising the price. Improve the terms that make the seller confident the deal will close."
+      "A stronger next offer does not always mean only raising the price. Improve the terms this particular seller cares about most."
   };
+}
+
+function getOutcomeEyebrow(result) {
+  if (result.category === "Risky Win") {
+    return "Offer accepted, but risky";
+  }
+
+  return result.won ? "Offer accepted" : "Offer not selected";
+}
+
+const confettiColors = ["#176b57", "#f3c665", "#d88955", "#8ec6d3"];
+
+function Confetti() {
+  const pieces = Array.from({ length: 28 }, (_, index) => ({
+    id: index,
+    left: `${(index * 37) % 100}%`,
+    delay: `${(index % 9) * 0.14}s`,
+    duration: `${2.4 + (index % 5) * 0.4}s`,
+    color: confettiColors[index % confettiColors.length]
+  }));
+
+  return (
+    <div className="confetti" aria-hidden="true">
+      {pieces.map((piece) => (
+        <span
+          key={piece.id}
+          style={{
+            left: piece.left,
+            animationDelay: piece.delay,
+            animationDuration: piece.duration,
+            background: piece.color
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 function ResultScreen({ house, offer, result, onRestart, onReview }) {
   const isReckless = result.category === "Risky Win";
   const outcomeDetails = getOutcomeDetails(result);
   const winningOffer = result.winningOffer;
+  const persona = result.persona;
+  const scorecard = loadScorecard();
 
   return (
     <section className="result-screen">
+      {result.category === "Smart Win" && <Confetti />}
       <ProgressBar currentStep={4} />
 
       <div className="result-card">
-        <p className="eyebrow">
-          {result.category === "Risky Win"
-            ? "Offer accepted, but risky"
-            : result.won
-              ? "Offer accepted"
-              : "Offer not selected"}
-        </p>
+        <p className="eyebrow">{getOutcomeEyebrow(result)}</p>
         <h1>{result.category}</h1>
         <p className="result-lesson">{result.lesson}</p>
 
@@ -95,12 +121,14 @@ function ResultScreen({ house, offer, result, onRestart, onReview }) {
 
         <div className="result-insights">
           <section>
-            <h2>What the seller cared about</h2>
-            <p>{outcomeDetails.cared}</p>
+            <h2>What {persona.label.toLowerCase()} cared about</h2>
+            <p>
+              {persona.headline} {persona.decisionStyle}
+            </p>
             <div className="priority-list result-priorities">
-              {house.sellerPriorities.map((priority) => (
-                <span className="priority-chip" key={priority}>
-                  {priority}
+              {getPersonaTopFactors(persona, 3).map((factor) => (
+                <span className="priority-chip" key={factor}>
+                  {factor}
                 </span>
               ))}
             </div>
@@ -134,14 +162,37 @@ function ResultScreen({ house, offer, result, onRestart, onReview }) {
           <p>{result.winningReason}</p>
         </div>
 
+        <div className="scorecard-strip">
+          <h2>Your track record</h2>
+          <div className="scorecard-stats">
+            <div>
+              <span>Rounds</span>
+              <strong>{scorecard.plays}</strong>
+            </div>
+            <div>
+              <span>Smart wins</span>
+              <strong>{scorecard.smartWins}</strong>
+            </div>
+            <div>
+              <span>Risky wins</span>
+              <strong>{scorecard.riskyWins}</strong>
+            </div>
+            <div>
+              <span>Disciplined walkaways</span>
+              <strong>{scorecard.walkaways}</strong>
+            </div>
+          </div>
+        </div>
+
         <div className="result-actions">
           <button className="secondary-button" type="button" onClick={onReview}>
             Adjust offer
           </button>
           <button className="primary-button" type="button" onClick={onRestart}>
-            Play again
+            Face a new seller
           </button>
         </div>
+        <p className="next-seller-note">A different seller will review your next offer.</p>
       </div>
     </section>
   );
